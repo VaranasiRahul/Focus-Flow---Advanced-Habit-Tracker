@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "FocusTrack",
-    "slug": "focustrack",
+    "name": "FocusFlow",
+    "slug": "focusflow",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "focustrack",
+    "scheme": "focusflow",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
@@ -15,16 +15,20 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.myapp"
+      "bundleIdentifier": "com.focusflow.app"
     },
     "android": {
-      "package": "com.myapp",
+      "package": "com.focusflow.app",
       "adaptiveIcon": {
         "backgroundColor": "#0A0A0A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -38,11 +42,40 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-av"
+      "expo-av",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "FocusFlowWidget",
+              "label": "FocusFlow Tasks",
+              "description": "Shows today's pending tasks and time spent",
+              "previewImage": "./assets/images/icon.png",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 3,
+              "targetCellHeight": 2,
+              "updatePeriodMillis": 1800000,
+              "resizeable": "horizontal|vertical",
+              "clickActionActivity": "MainActivity"
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": "https://replit.com/"
+      },
+      "eas": {
+        "projectId": "1fe41ce3-3e11-43da-bf9c-d7f8951eb26b"
+      }
+    },
+    "owner": "rahul-varanasi"
   }
 }

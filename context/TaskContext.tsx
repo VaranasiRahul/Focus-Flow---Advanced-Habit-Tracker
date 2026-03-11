@@ -1,5 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
+
+// Refresh Android widget after data changes (safe no-op if widget not installed)
+async function tryRefreshWidget() {
+  if (Platform.OS !== "android") return;
+  try {
+    const { refreshWidget } = require("@/widgets/widgetRegistry");
+    await refreshWidget();
+  } catch (_e) {}
+}
 
 export interface Task {
   id: string;
@@ -78,11 +88,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   async function saveTasks(updated: Task[]) {
     setTasks(updated);
     await AsyncStorage.setItem(TASKS_KEY, JSON.stringify(updated));
+    tryRefreshWidget();
   }
 
   async function saveRecords(updated: DailyRecord[]) {
     setDailyRecords(updated);
     await AsyncStorage.setItem(RECORDS_KEY, JSON.stringify(updated));
+    tryRefreshWidget();
   }
 
   const addTask = useCallback(async (taskData: Omit<Task, "id" | "createdAt">) => {

@@ -20,7 +20,7 @@ interface TimerContextType {
   pomodoroCount: number;
   totalSecondsSpent: number;
   pomodoroPartsCompleted: number;
-  startTask: (task: Task) => void;
+  startTask: (task: Task, initialSeconds?: number, initialParts?: number) => void;
   toggle: () => void;
   reset: () => void;
   skipPhase: () => void;
@@ -49,14 +49,15 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const totalSecondsRef = useRef(0);
   const pomodoroPartsRef = useRef(0);
+  const pomodoroCountRef = useRef(0);
+  const activeTaskRef = useRef<Task | null>(null);
+  const currentPhaseRef = useRef<TimerPhase>("focus");
 
-  useEffect(() => {
-    totalSecondsRef.current = totalSecondsSpent;
-  }, [totalSecondsSpent]);
-
-  useEffect(() => {
-    pomodoroPartsRef.current = pomodoroPartsCompleted;
-  }, [pomodoroPartsCompleted]);
+  useEffect(() => { totalSecondsRef.current = totalSecondsSpent; }, [totalSecondsSpent]);
+  useEffect(() => { pomodoroPartsRef.current = pomodoroPartsCompleted; }, [pomodoroPartsCompleted]);
+  useEffect(() => { pomodoroCountRef.current = pomodoroCount; }, [pomodoroCount]);
+  useEffect(() => { activeTaskRef.current = activeTask; }, [activeTask]);
+  useEffect(() => { currentPhaseRef.current = currentPhase; }, [currentPhase]);
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current) {
@@ -65,32 +66,67 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const startTask = useCallback((task: Task) => {
+  function handlePhaseComplete() {
+    const task = activeTaskRef.current;
+    if (!task) return;
+    const phase = currentPhaseRef.current;
+    const count = pomodoroCountRef.current;
+
+    if (phase === "focus") {
+      const newParts = pomodoroPartsRef.current + 1;
+      pomodoroPartsRef.current = newParts;
+      setPomodoroPartsCompleted(newParts);
+      const newCount = count + 1;
+      pomodoroCountRef.current = newCount;
+      setPomodoroCount(newCount);
+      const nextPhase: TimerPhase = newCount % 4 === 0 ? "longBreak" : "shortBreak";
+      currentPhaseRef.current = nextPhase;
+      setCurrentPhase(nextPhase);
+      const duration = getPhaseDuration(task, nextPhase);
+      setTimeRemaining(duration);
+      setPhaseDuration(duration);
+    } else {
+      currentPhaseRef.current = "focus";
+      setCurrentPhase("focus");
+      const duration = getPhaseDuration(task, "focus");
+      setTimeRemaining(duration);
+      setPhaseDuration(duration);
+    }
+  }
+
+  // FIX: startTask now accepts initialSeconds so saved time is preserved on re-open
+  const startTask = useCallback((task: Task, initialSeconds: number = 0, initialParts: number = 0) => {
     clearTimer();
     const duration = getPhaseDuration(task, "focus");
     setActiveTask(task);
+    activeTaskRef.current = task;
     setIsRunning(false);
     setTimeRemaining(duration);
     setPhaseDuration(duration);
     setCurrentPhase("focus");
+    currentPhaseRef.current = "focus";
     setPomodoroCount(0);
-    setTotalSecondsSpent(0);
-    setPomodoroPartsCompleted(0);
-    totalSecondsRef.current = 0;
-    pomodoroPartsRef.current = 0;
+    pomodoroCountRef.current = 0;
+    setTotalSecondsSpent(initialSeconds);
+    totalSecondsRef.current = initialSeconds;
+    setPomodoroPartsCompleted(initialParts);
+    pomodoroPartsRef.current = initialParts;
   }, [clearTimer]);
 
   const stopTask = useCallback(() => {
     clearTimer();
     setActiveTask(null);
+    activeTaskRef.current = null;
     setIsRunning(false);
     setTimeRemaining(0);
     setPhaseDuration(0);
     setCurrentPhase("focus");
+    currentPhaseRef.current = "focus";
     setPomodoroCount(0);
+    pomodoroCountRef.current = 0;
     setTotalSecondsSpent(0);
-    setPomodoroPartsCompleted(0);
     totalSecondsRef.current = 0;
+    setPomodoroPartsCompleted(0);
     pomodoroPartsRef.current = 0;
   }, [clearTimer]);
 
@@ -101,115 +137,70 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           if (prev <= 1) {
             setIsRunning(false);
             clearTimer();
-            handlePhaseComplete();
+            setTimeout(handlePhaseComplete, 0);
             return 0;
           }
           return prev - 1;
         });
-
-        setCurrentPhase((phase) => {
-          if (phase === "focus") {
-            setTotalSecondsSpent((s) => {
-              const next = s + 1;
-              totalSecondsRef.current = next;
-              return next;
-            });
-          }
-          return phase;
-        });
+        if (currentPhaseRef.current === "focus") {
+          setTotalSecondsSpent((s) => {
+            const next = s + 1;
+            totalSecondsRef.current = next;
+            return next;
+          });
+        }
       }, 1000);
     } else {
       clearTimer();
     }
-
     return () => clearTimer();
   }, [isRunning, activeTask]);
 
-  function handlePhaseComplete() {
-    if (!activeTask) return;
-
-    setCurrentPhase((phase) => {
-      setPomodoroCount((count) => {
-        if (phase === "focus") {
-          const newParts = pomodoroPartsRef.current + 1;
-          pomodoroPartsRef.current = newParts;
-          setPomodoroPartsCompleted(newParts);
-
-          const newCount = count + 1;
-          const nextPhase = newCount % 4 === 0 ? "longBreak" : "shortBreak";
-          const duration = getPhaseDuration(activeTask, nextPhase);
-          setTimeRemaining(duration);
-          setPhaseDuration(duration);
-          return newCount;
-        } else {
-          const duration = getPhaseDuration(activeTask, "focus");
-          setTimeRemaining(duration);
-          setPhaseDuration(duration);
-          return count;
-        }
-      });
-
-      if (phase === "focus") {
-        const newCount = pomodoroCount + 1;
-        return newCount % 4 === 0 ? "longBreak" : "shortBreak";
-      }
-      return "focus";
-    });
-  }
-
-  const toggle = useCallback(() => {
-    setIsRunning((r) => !r);
-  }, []);
+  const toggle = useCallback(() => { setIsRunning((r) => !r); }, []);
 
   const reset = useCallback(() => {
     clearTimer();
     setIsRunning(false);
-    if (activeTask) {
-      const duration = getPhaseDuration(activeTask, "focus");
+    const task = activeTaskRef.current;
+    if (task) {
+      const duration = getPhaseDuration(task, "focus");
       setTimeRemaining(duration);
       setPhaseDuration(duration);
+      currentPhaseRef.current = "focus";
       setCurrentPhase("focus");
       setPomodoroCount(0);
-      setTotalSecondsSpent(0);
-      setPomodoroPartsCompleted(0);
-      totalSecondsRef.current = 0;
-      pomodoroPartsRef.current = 0;
+      pomodoroCountRef.current = 0;
     }
-  }, [activeTask, clearTimer]);
+  }, [clearTimer]);
 
   const skipPhase = useCallback(() => {
     clearTimer();
     setIsRunning(false);
-    if (!activeTask) return;
-
-    setCurrentPhase((phase) => {
-      setPomodoroCount((count) => {
-        if (phase === "focus") {
-          const newParts = pomodoroPartsRef.current + 1;
-          pomodoroPartsRef.current = newParts;
-          setPomodoroPartsCompleted(newParts);
-
-          const newCount = count + 1;
-          const nextPhase = newCount % 4 === 0 ? "longBreak" : "shortBreak";
-          const duration = getPhaseDuration(activeTask, nextPhase);
-          setTimeRemaining(duration);
-          setPhaseDuration(duration);
-          return newCount;
-        } else {
-          const duration = getPhaseDuration(activeTask, "focus");
-          setTimeRemaining(duration);
-          setPhaseDuration(duration);
-          return count;
-        }
-      });
-
-      if (phase === "focus") {
-        const newCount = pomodoroCount + 1;
-        return newCount % 4 === 0 ? "longBreak" : "shortBreak";
-      }
-      return "focus";
-    });
-  }, [activeTask, clearTimer, pomodoroCount]);
+    const task = activeTaskRef.current;
+    if (!task) return;
+    const phase = currentPhaseRef.current;
+    const count = pomodoroCountRef.current;
+    if (phase === "focus") {
+      const newParts = pomodoroPartsRef.current + 1;
+      pomodoroPartsRef.current = newParts;
+      setPomodoroPartsCompleted(newParts);
+      const newCount = count + 1;
+      pomodoroCountRef.current = newCount;
+      setPomodoroCount(newCount);
+      const nextPhase: TimerPhase = newCount % 4 === 0 ? "longBreak" : "shortBreak";
+      currentPhaseRef.current = nextPhase;
+      setCurrentPhase(nextPhase);
+      const duration = getPhaseDuration(task, nextPhase);
+      setTimeRemaining(duration);
+      setPhaseDuration(duration);
+    } else {
+      currentPhaseRef.current = "focus";
+      setCurrentPhase("focus");
+      const duration = getPhaseDuration(task, "focus");
+      setTimeRemaining(duration);
+      setPhaseDuration(duration);
+    }
+  }, [clearTimer]);
 
   return (
     <TimerContext.Provider
