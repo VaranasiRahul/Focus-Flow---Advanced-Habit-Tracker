@@ -1,117 +1,66 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  Platform,
-  Switch,
-  Modal,
-  TextInput,
-} from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Switch, Modal, TextInput, Platform, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { Colors } from "@/constants/colors";
+import { useTheme } from "@/context/ThemeContext";
 import { useTaskContext, Task } from "@/context/TaskContext";
+import { THEMES, THEME_LABELS, ThemeName } from "@/constants/colors";
 
-interface EditTaskModalProps {
-  task: Task | null;
-  visible: boolean;
-  onClose: () => void;
-}
-
-function EditTaskModal({ task, visible, onClose }: EditTaskModalProps) {
+// ---- Edit Task Modal ----
+function EditTaskModal({ task, visible, onClose }: { task: Task | null; visible: boolean; onClose: () => void }) {
+  const { colors } = useTheme();
   const { updateTask } = useTaskContext();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState(task?.name ?? "");
-  const [targetMinutes, setTargetMinutes] = useState(String(task?.targetMinutes ?? 60));
-  const [colorIndex, setColorIndex] = useState(
-    task ? Math.max(Colors.taskColors.indexOf(task.color), 0) : 0
-  );
+  const [targetMins, setTargetMins] = useState(String(task?.targetMinutes ?? 60));
+  const [colorIdx, setColorIdx] = useState(colors.taskColors.indexOf(task?.color ?? colors.accent));
   const [isDaily, setIsDaily] = useState(task?.isDaily ?? true);
-  const [notificationTime, setNotificationTime] = useState(task?.notificationTime ?? "09:00");
+  const [notifTime, setNotifTime] = useState(task?.notificationTime ?? "09:00");
 
   React.useEffect(() => {
     if (task) {
-      setName(task.name);
-      setTargetMinutes(String(task.targetMinutes));
-      setColorIndex(Math.max(Colors.taskColors.indexOf(task.color), 0));
-      setIsDaily(task.isDaily);
-      setNotificationTime(task.notificationTime);
+      setName(task.name); setTargetMins(String(task.targetMinutes));
+      setColorIdx(Math.max(colors.taskColors.indexOf(task.color), 0));
+      setIsDaily(task.isDaily); setNotifTime(task.notificationTime);
     }
   }, [task]);
 
   function handleSave() {
-    if (!task) return;
-    if (!name.trim()) { Alert.alert("Name required", "Please enter a task name."); return; }
-    const mins = parseInt(targetMinutes, 10);
-    if (isNaN(mins) || mins < 1) { Alert.alert("Invalid duration", "Please enter a valid duration in minutes."); return; }
-    updateTask(task.id, {
-      name: name.trim(),
-      targetMinutes: mins,
-      color: Colors.taskColors[colorIndex],
-      isDaily,
-      notificationTime,
-    });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (!task || !name.trim()) return;
+    const mins = parseInt(targetMins, 10);
+    if (isNaN(mins) || mins < 1) { Alert.alert("Invalid duration"); return; }
+    updateTask(task.id, { name: name.trim(), targetMinutes: mins, color: colors.taskColors[Math.max(colorIdx, 0)], isDaily, notificationTime: notifTime });
     onClose();
   }
 
   return (
     <Modal visible={visible} animationType="slide" transparent presentationStyle="overFullScreen">
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]}>
-          <View style={styles.modalHandle} />
-          <Text style={styles.modalTitle}>Edit Task</Text>
-          <Text style={styles.inputLabel}>Task Name</Text>
-          <TextInput
-            style={styles.textInput} value={name} onChangeText={setName}
-            placeholder="Task name" placeholderTextColor={Colors.textMuted}
-          />
-          <Text style={styles.inputLabel}>Target Duration (minutes)</Text>
-          <TextInput
-            style={styles.textInput} value={targetMinutes} onChangeText={setTargetMinutes}
-            keyboardType="number-pad" placeholderTextColor={Colors.textMuted}
-          />
-          <Text style={styles.inputLabel}>Schedule</Text>
-          <View style={styles.radioRow}>
-            <TouchableOpacity style={[styles.radioBtn, isDaily && styles.radioBtnActive]} onPress={() => setIsDaily(true)}>
-              <View style={[styles.radioCircle, isDaily && styles.radioCircleActive]}>
-                {isDaily && <View style={styles.radioDot} />}
-              </View>
-              <Text style={[styles.radioText, isDaily && styles.radioTextActive]}>Every day</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.radioBtn, !isDaily && styles.radioBtnActive]} onPress={() => setIsDaily(false)}>
-              <View style={[styles.radioCircle, !isDaily && styles.radioCircleActive]}>
-                {!isDaily && <View style={styles.radioDot} />}
-              </View>
-              <Text style={[styles.radioText, !isDaily && styles.radioTextActive]}>Today only</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.inputLabel}>Notification Time</Text>
-          <TextInput
-            style={styles.textInput} value={notificationTime} onChangeText={setNotificationTime}
-            placeholder="09:00" placeholderTextColor={Colors.textMuted}
-            keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "default"}
-          />
-          <Text style={styles.inputLabel}>Color</Text>
-          <View style={styles.colorRow}>
-            {Colors.taskColors.map((c, i) => (
-              <TouchableOpacity
-                key={c}
-                style={[styles.colorDot, { backgroundColor: c }, i === colorIndex && styles.colorDotSelected]}
-                onPress={() => setColorIndex(i)}
-              />
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" }}>
+        <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: insets.bottom + 16 }}>
+          <View style={{ width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: "center", marginBottom: 16 }} />
+          <Text style={{ fontSize: 18, color: colors.text, fontFamily: "Inter_700Bold", marginBottom: 16 }}>Edit Task</Text>
+          <Text style={{ fontSize: 12, color: colors.textSecondary, fontFamily: "Inter_500Medium", marginBottom: 4 }}>Name</Text>
+          <TextInput style={{ backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.text, borderWidth: 1, borderColor: colors.border, marginBottom: 12 }}
+            value={name} onChangeText={setName} />
+          <Text style={{ fontSize: 12, color: colors.textSecondary, fontFamily: "Inter_500Medium", marginBottom: 4 }}>Target (minutes)</Text>
+          <TextInput style={{ backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.text, borderWidth: 1, borderColor: colors.border, marginBottom: 12 }}
+            value={targetMins} onChangeText={setTargetMins} keyboardType="number-pad" />
+          <Text style={{ fontSize: 12, color: colors.textSecondary, fontFamily: "Inter_500Medium", marginBottom: 8 }}>Color</Text>
+          <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+            {colors.taskColors.map((c, i) => (
+              <TouchableOpacity key={c} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: c, ...(i === colorIdx ? { borderWidth: 3, borderColor: "#fff" } : {}) }} onPress={() => setColorIdx(i)} />
             ))}
           </View>
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>Save Changes</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <Text style={{ fontSize: 14, color: colors.text, fontFamily: "Inter_500Medium" }}>Daily Task</Text>
+            <Switch value={isDaily} onValueChange={setIsDaily} trackColor={{ false: colors.border, true: colors.accent }} thumbColor={colors.text} />
+          </View>
+          <TouchableOpacity style={{ backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 14, alignItems: "center" }} onPress={handleSave}>
+            <Text style={{ fontSize: 16, color: "#000", fontFamily: "Inter_700Bold" }}>Save</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+          <TouchableOpacity style={{ alignItems: "center", paddingVertical: 10 }} onPress={onClose}>
+            <Text style={{ fontSize: 15, color: colors.textSecondary, fontFamily: "Inter_500Medium" }}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -119,243 +68,207 @@ function EditTaskModal({ task, visible, onClose }: EditTaskModalProps) {
   );
 }
 
-function WidgetPreview() {
-  const { getTodayTasks, getTodayRecord } = useTaskContext();
-  const todayTasks = getTodayTasks();
-  const pendingTasks = todayTasks.filter((t) => {
-    const record = getTodayRecord(t.id);
-    return !record || record.secondsSpent < t.targetMinutes * 60;
-  });
-  const nextTask = pendingTasks[0];
+// ---- Theme Picker ----
+function ThemePicker() {
+  const { colors, themeName, setTheme } = useTheme();
+  const themeKeys = Object.keys(THEMES) as ThemeName[];
 
   return (
-    <View style={styles.widgetSection}>
-      <Text style={styles.sectionTitle}>Widget Preview</Text>
-      <Text style={styles.sectionSubtitle}>
-        Add the FocusFlow widget to your home screen to see today's pending tasks at a glance.
-      </Text>
-      <View style={styles.widgetPreviewCard}>
-        <View style={styles.widgetCard}>
-          <Text style={styles.widgetTitle}>FocusFlow</Text>
-          <View style={styles.widgetRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.widgetTaskName} numberOfLines={1}>
-                {nextTask ? nextTask.name : "All done!"}
-              </Text>
-              <Text style={styles.widgetTime}>
-                {pendingTasks.length > 0 ? `${pendingTasks.length} pending` : "0 pending"}
-              </Text>
-              <Text style={styles.widgetLabel}>Today's Tasks</Text>
-            </View>
-            <View style={[styles.widgetPlayBtn, { backgroundColor: nextTask ? nextTask.color : Colors.accent }]}>
-              <Feather name={pendingTasks.length > 0 ? "play" : "check"} size={16} color="#000" />
-            </View>
-          </View>
-        </View>
+    <View style={{ gap: 8 }}>
+      <Text style={{ fontSize: 13, color: colors.textSecondary, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 }}>Theme</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {themeKeys.map((key) => {
+          const theme = THEMES[key];
+          const isActive = themeName === key;
+          return (
+            <TouchableOpacity key={key}
+              style={{ width: (Platform.OS === "web" ? 280 : (350 / 2 - 20)), flexGrow: 1, borderRadius: 14, overflow: "hidden", borderWidth: 2, borderColor: isActive ? theme.accent : "transparent" }}
+              onPress={() => { setTheme(key); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}>
+              {/* Theme mini-preview */}
+              <View style={{ backgroundColor: theme.background, padding: 12, gap: 6 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <View style={{ flexDirection: "row", gap: 4 }}>
+                    {[theme.accent, theme.card, theme.border].map((c, i) => (
+                      <View key={i} style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c }} />
+                    ))}
+                  </View>
+                  {isActive && <Feather name="check-circle" size={14} color={theme.accent} />}
+                </View>
+                <View style={{ height: 4, backgroundColor: theme.card, borderRadius: 2, overflow: "hidden" }}>
+                  <View style={{ height: "100%", width: "65%", backgroundColor: theme.accent, borderRadius: 2 }} />
+                </View>
+                <View style={{ flexDirection: "row", gap: 4 }}>
+                  <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: theme.accent }} />
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <View style={{ height: 4, width: "80%", backgroundColor: theme.text + "66", borderRadius: 2 }} />
+                    <View style={{ height: 3, width: "50%", backgroundColor: theme.textMuted, borderRadius: 2 }} />
+                  </View>
+                </View>
+              </View>
+              <View style={{ backgroundColor: theme.card, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Text style={{ fontSize: 12, color: isActive ? theme.accent : theme.text, fontFamily: "Inter_700Bold" }}>
+                  {THEME_LABELS[key]}
+                </Text>
+                <Text style={{ fontSize: 10, color: theme.textSecondary, fontFamily: "Inter_400Regular" }}>
+                  {key === "dark" ? "AMOLED black" : key === "midnight" ? "Deep violet" : key === "forest" ? "Lush green" : key === "ocean" ? "Deep cyan" : key === "ember" ? "Warm orange" : "Soft purple"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
-      <View style={styles.widgetNote}>
-        <Feather name="info" size={14} color={Colors.textMuted} />
-        <Text style={styles.widgetNoteText}>
-          To add: Long press your home screen → Widgets → FocusFlow
+      <View style={{ backgroundColor: colors.card, borderRadius: 10, padding: 12, flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+        <Feather name="info" size={14} color={colors.textMuted} style={{ marginTop: 2 }} />
+        <Text style={{ flex: 1, fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" }}>
+          All themes are dark/AMOLED-optimized to save battery on OLED displays. Light mode is not included by design.
         </Text>
       </View>
     </View>
   );
 }
 
+// ---- Row helpers ----
+function SettingRow({ icon, label, right, onPress, colors }: { icon: string; label: string; right?: React.ReactNode; onPress?: () => void; colors: any }) {
+  const Inner = (
+    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.background, borderRadius: 14, padding: 14, gap: 12 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: colors.card, alignItems: "center", justifyContent: "center" }}>
+          <Feather name={icon as any} size={16} color={colors.textSecondary} />
+        </View>
+        <Text style={{ fontSize: 15, color: colors.text, fontFamily: "Inter_500Medium" }}>{label}</Text>
+      </View>
+      {right ?? <Feather name="chevron-right" size={16} color={colors.textMuted} />}
+    </View>
+  );
+  return onPress ? <TouchableOpacity onPress={onPress}>{Inner}</TouchableOpacity> : Inner;
+}
+
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { tasks, deleteTask } = useTaskContext();
-  const [hapticEnabled, setHapticEnabled] = useState(true);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const topPadding = Platform.OS === "web" ? 67 : insets.top;
+  const { colors, themeName } = useTheme();
+  const { tasks, deleteTask, dailyRecords } = useTaskContext();
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  function handleDeleteTask(task: Task) {
-    Alert.alert(
-      "Delete Task",
-      `Are you sure you want to delete "${task.name}"? All records will be removed.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            await deleteTask(task.id);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          },
-        },
-      ]
-    );
-  }
+  const totalSecs = dailyRecords.reduce((s, r) => s + r.secondsSpent, 0);
+  const h = Math.floor(totalSecs / 3600), m = Math.floor((totalSecs % 3600) / 60);
+  const totalFmt = h > 0 ? `${h}h ${String(m).padStart(2,"0")}m` : `${m}m`;
 
   return (
-    <View style={[styles.container, { paddingTop: topPadding }]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: topPad }}>
+      <View style={{ paddingHorizontal: 20, paddingVertical: 14 }}>
+        <Text style={{ fontSize: 28, color: colors.text, fontFamily: "Inter_700Bold" }}>Settings</Text>
       </View>
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: Platform.OS === "web" ? 120 : Platform.OS === "android" ? 20 : 100 + insets.bottom }]}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 20, paddingBottom: Platform.OS === "android" ? 20 : 100 + insets.bottom }}
         showsVerticalScrollIndicator={false}
       >
-        <WidgetPreview />
+        {/* ---- THEMES ---- */}
+        <ThemePicker />
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App Preferences</Text>
-          <View style={styles.card}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.settingIcon, { backgroundColor: "#4A90E220" }]}>
-                  <Feather name="zap" size={16} color="#4A90E2" />
-                </View>
-                <Text style={styles.settingLabel}>Haptic Feedback</Text>
+        {/* ---- APP STATS SUMMARY ---- */}
+        <View style={{ gap: 8 }}>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 }}>Your Stats</Text>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {[["Tasks", String(tasks.length), "layers"], ["Total Focus", totalFmt, "clock"], ["Sessions", String(dailyRecords.length), "activity"]].map(([l, v, icon]) => (
+              <View key={l} style={{ flex: 1, backgroundColor: colors.card, borderRadius: 14, padding: 12, alignItems: "center", gap: 4 }}>
+                <Feather name={icon as any} size={18} color={colors.accent} />
+                <Text style={{ fontSize: 16, color: colors.text, fontFamily: "Inter_700Bold" }}>{v}</Text>
+                <Text style={{ fontSize: 10, color: colors.textMuted, fontFamily: "Inter_400Regular" }}>{l}</Text>
               </View>
-              <Switch
-                value={hapticEnabled}
-                onValueChange={setHapticEnabled}
-                trackColor={{ false: Colors.border, true: Colors.accent }}
-                thumbColor={Colors.text}
-              />
-            </View>
+            ))}
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Manage Tasks</Text>
+        {/* ---- WIDGET PREVIEW ---- */}
+        <View style={{ gap: 8 }}>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 }}>Home Screen Widget</Text>
+          <View style={{ backgroundColor: "#1A2000", borderRadius: 20, padding: 16, borderWidth: 1, borderColor: colors.accent + "44" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <Text style={{ fontSize: 11, color: colors.textMuted, fontFamily: "Inter_700Bold" }}>FocusFlow</Text>
+              <View style={{ backgroundColor: colors.accent + "33", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+                <Text style={{ fontSize: 10, color: colors.accent, fontFamily: "Inter_700Bold" }}>{tasks.length} pending</Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 15, color: colors.text, fontFamily: "Inter_700Bold", marginBottom: 4 }}>{tasks[0]?.name ?? "No tasks today"}</Text>
+            <Text style={{ fontSize: 24, color: colors.accent, fontFamily: "Inter_700Bold" }}>0h 00m <Text style={{ fontSize: 12, color: colors.textSecondary, fontFamily: "Inter_400Regular" }}>spent</Text></Text>
+            <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 8, overflow: "hidden" }}>
+              <View style={{ height: "100%", width: "0%", backgroundColor: colors.accent, borderRadius: 2 }} />
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+              <Text style={{ fontSize: 10, color: colors.textMuted, fontFamily: "Inter_400Regular" }}>Tap to start</Text>
+              <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ fontSize: 12, color: "#000" }}>▶</Text>
+              </View>
+            </View>
+          </View>
+          <Text style={{ fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" }}>
+            Widget requires EAS Build (not Expo Go). See WIDGET_SETUP.md for instructions.
+          </Text>
+        </View>
+
+        {/* ---- MANAGE TASKS ---- */}
+        <View style={{ gap: 8 }}>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 }}>Manage Tasks</Text>
           {tasks.length === 0 ? (
-            <View style={styles.emptyTasks}>
-              <Text style={styles.emptyTasksText}>No tasks created yet.</Text>
+            <View style={{ backgroundColor: colors.card, borderRadius: 14, padding: 20, alignItems: "center" }}>
+              <Text style={{ color: colors.textMuted, fontFamily: "Inter_400Regular", fontSize: 14 }}>No tasks yet. Add one from the Home tab.</Text>
             </View>
-          ) : (
-            <View style={styles.card}>
-              {tasks.map((task, index) => (
-                <View key={task.id} style={[styles.taskRow, index < tasks.length - 1 && styles.taskRowBorder]}>
-                  <View style={[styles.taskColorBar, { backgroundColor: task.color }]} />
-                  <View style={styles.taskRowInfo}>
-                    <Text style={styles.taskRowName} numberOfLines={1}>{task.name}</Text>
-                    <Text style={styles.taskRowMeta}>
-                      {task.targetMinutes}m · {task.isDaily ? "Daily" : "One-time"} · {task.notificationTime}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => setEditingTask(task)}
-                    style={styles.editBtn}
-                  >
-                    <Feather name="edit-2" size={15} color={Colors.accent} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleDeleteTask(task)} style={styles.deleteBtn}>
-                    <Feather name="trash-2" size={15} color="#E74C3C" />
-                  </TouchableOpacity>
-                </View>
-              ))}
+          ) : tasks.map((task) => (
+            <View key={task.id} style={{ backgroundColor: colors.card, borderRadius: 14, padding: 14, flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: task.color }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, color: colors.text, fontFamily: "Inter_600SemiBold" }}>{task.name}</Text>
+                <Text style={{ fontSize: 12, color: colors.textSecondary, fontFamily: "Inter_400Regular" }}>{task.targetMinutes}m target · {task.isDaily ? "Daily" : "One-time"}</Text>
+              </View>
+              <TouchableOpacity style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: colors.background }}
+                onPress={() => setEditTask(task)}><Feather name="edit-2" size={16} color={colors.accent} /></TouchableOpacity>
+              <TouchableOpacity style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "#E74C3C22" }}
+                onPress={() => Alert.alert("Delete Task", `Delete "${task.name}"? This removes all its history.`, [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Delete", style: "destructive", onPress: () => deleteTask(task.id) },
+                ])}><Feather name="trash-2" size={16} color="#E74C3C" /></TouchableOpacity>
             </View>
-          )}
+          ))}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data & Privacy</Text>
-          <View style={styles.card}>
-            <View style={styles.infoRow}>
-              <Feather name="database" size={16} color={Colors.textSecondary} />
-              <Text style={styles.infoText}>
-                All data is stored locally on your device using AsyncStorage and is never automatically deleted.
-              </Text>
+        {/* ---- APP PREFERENCES ---- */}
+        <View style={{ gap: 8 }}>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 }}>App Preferences</Text>
+          <SettingRow icon="bell" label="Notifications" colors={colors} />
+          <SettingRow icon="moon" label="Always dark" right={<Switch value={true} trackColor={{ false: colors.border, true: colors.accent }} thumbColor={colors.text} />} colors={colors} />
+          <SettingRow icon="volume-2" label="Sound Effects" right={<Switch value={true} trackColor={{ false: colors.border, true: colors.accent }} thumbColor={colors.text} />} colors={colors} />
+        </View>
+
+        {/* ---- DATA & PRIVACY ---- */}
+        <View style={{ gap: 8 }}>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 }}>Data & Privacy</Text>
+          <View style={{ backgroundColor: colors.card, borderRadius: 14, padding: 14, gap: 8 }}>
+            <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+              <Feather name="shield" size={14} color={colors.accent} style={{ marginTop: 2 }} />
+              <Text style={{ flex: 1, fontSize: 13, color: colors.textSecondary, fontFamily: "Inter_400Regular" }}>All data is stored locally on your device using AsyncStorage. Nothing is uploaded to any server.</Text>
             </View>
           </View>
+          <SettingRow icon="download" label="Export Data" colors={colors} onPress={() => Alert.alert("Export", "Export as JSON coming soon.")} />
+          <SettingRow icon="trash" label="Clear All Data" colors={colors} onPress={() => Alert.alert("Clear All Data", "This will delete all tasks and history permanently.", [{ text: "Cancel", style: "cancel" }, { text: "Clear", style: "destructive" }])} />
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <View style={styles.card}>
-            <View style={styles.aboutRow}>
-              <View style={[styles.settingIcon, { backgroundColor: `${Colors.accent}20` }]}>
-                <Feather name="target" size={16} color={Colors.accent} />
+        {/* ---- ABOUT ---- */}
+        <View style={{ gap: 8 }}>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 }}>About</Text>
+          <View style={{ backgroundColor: colors.card, borderRadius: 14, padding: 16, gap: 6 }}>
+            {[["App", "FocusFlow"], ["Version", "1.0.0"], ["Theme", THEME_LABELS[themeName]], ["Platform", Platform.OS]].map(([l, v]) => (
+              <View key={l} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ fontSize: 14, color: colors.textSecondary, fontFamily: "Inter_400Regular" }}>{l}</Text>
+                <Text style={{ fontSize: 14, color: colors.text, fontFamily: "Inter_500Medium" }}>{v}</Text>
               </View>
-              <View style={styles.aboutInfo}>
-                <Text style={styles.aboutAppName}>FocusFlow</Text>
-                <Text style={styles.aboutVersion}>Version 1.0.0</Text>
-              </View>
-            </View>
-            <View style={styles.aboutDivider} />
-            <Text style={styles.aboutDescription}>
-              A habit and focus tracker with Pomodoro timer, ambient sounds, streak tracking, and analytics. Your data is stored locally and never deleted automatically.
-            </Text>
+            ))}
           </View>
         </View>
       </ScrollView>
 
-      <EditTaskModal
-        task={editingTask}
-        visible={editingTask !== null}
-        onClose={() => setEditingTask(null)}
-      />
+      <EditTaskModal task={editTask} visible={!!editTask} onClose={() => setEditTask(null)} />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingVertical: 14 },
-  headerTitle: { fontSize: 24, color: Colors.text, fontFamily: "Inter_700Bold" },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, gap: 20 },
-  section: { gap: 8 },
-  sectionTitle: { fontSize: 13, color: Colors.textSecondary, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 },
-  sectionSubtitle: { fontSize: 13, color: Colors.textMuted, fontFamily: "Inter_400Regular", marginBottom: 8 },
-  card: { backgroundColor: Colors.card, borderRadius: 16, overflow: "hidden" },
-  settingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16 },
-  settingLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  settingIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  settingLabel: { fontSize: 15, color: Colors.text, fontFamily: "Inter_500Medium" },
-  widgetSection: { gap: 8 },
-  widgetPreviewCard: { backgroundColor: Colors.card, borderRadius: 16, padding: 20, alignItems: "center" },
-  widgetCard: { backgroundColor: "#1A1A2E", borderRadius: 16, padding: 16, width: 200 },
-  widgetTitle: { fontSize: 10, color: Colors.textMuted, fontFamily: "Inter_500Medium", marginBottom: 8, letterSpacing: 1, textTransform: "uppercase" },
-  widgetRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  widgetTaskName: { fontSize: 13, color: Colors.text, fontFamily: "Inter_600SemiBold" },
-  widgetTime: { fontSize: 20, color: Colors.text, fontFamily: "Inter_700Bold" },
-  widgetLabel: { fontSize: 9, color: Colors.textMuted, fontFamily: "Inter_400Regular" },
-  widgetPlayBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  widgetNote: { flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: Colors.card, borderRadius: 12, padding: 12 },
-  widgetNoteText: { flex: 1, fontSize: 12, color: Colors.textMuted, fontFamily: "Inter_400Regular", lineHeight: 18 },
-  taskRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
-  taskRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
-  taskColorBar: { width: 4, height: 36, borderRadius: 2 },
-  taskRowInfo: { flex: 1 },
-  taskRowName: { fontSize: 15, color: Colors.text, fontFamily: "Inter_500Medium" },
-  taskRowMeta: { fontSize: 11, color: Colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
-  editBtn: { width: 34, height: 34, alignItems: "center", justifyContent: "center" },
-  deleteBtn: { width: 34, height: 34, alignItems: "center", justifyContent: "center" },
-  emptyTasks: { backgroundColor: Colors.card, borderRadius: 16, padding: 20, alignItems: "center" },
-  emptyTasksText: { fontSize: 14, color: Colors.textMuted, fontFamily: "Inter_400Regular" },
-  infoRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16 },
-  infoText: { flex: 1, fontSize: 13, color: Colors.textSecondary, fontFamily: "Inter_400Regular", lineHeight: 20 },
-  aboutRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16 },
-  aboutInfo: {},
-  aboutAppName: { fontSize: 16, color: Colors.text, fontFamily: "Inter_700Bold" },
-  aboutVersion: { fontSize: 12, color: Colors.textMuted, fontFamily: "Inter_400Regular" },
-  aboutDivider: { height: 1, backgroundColor: Colors.border, marginHorizontal: 16 },
-  aboutDescription: { fontSize: 13, color: Colors.textSecondary, fontFamily: "Inter_400Regular", padding: 16, lineHeight: 20 },
-  // Edit modal
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
-  modalSheet: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, gap: 8 },
-  modalHandle: { width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
-  modalTitle: { fontSize: 20, color: Colors.text, fontFamily: "Inter_700Bold", marginBottom: 8 },
-  inputLabel: { fontSize: 13, color: Colors.textSecondary, fontFamily: "Inter_500Medium", marginTop: 8, marginBottom: 4 },
-  textInput: { backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: Colors.text, fontFamily: "Inter_400Regular", borderWidth: 1, borderColor: Colors.border },
-  radioRow: { flexDirection: "row", gap: 12 },
-  radioBtn: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: Colors.background, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: Colors.border },
-  radioBtnActive: { borderColor: Colors.accent },
-  radioCircle: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: Colors.textMuted, alignItems: "center", justifyContent: "center" },
-  radioCircleActive: { borderColor: Colors.accent },
-  radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.accent },
-  radioText: { fontSize: 14, color: Colors.textSecondary, fontFamily: "Inter_500Medium" },
-  radioTextActive: { color: Colors.accent },
-  colorRow: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
-  colorDot: { width: 30, height: 30, borderRadius: 15 },
-  colorDotSelected: { borderWidth: 3, borderColor: Colors.text },
-  saveButton: { backgroundColor: Colors.accent, borderRadius: 14, paddingVertical: 14, alignItems: "center", marginTop: 12 },
-  saveButtonText: { fontSize: 16, color: "#000", fontFamily: "Inter_700Bold" },
-  cancelButton: { alignItems: "center", paddingVertical: 10 },
-  cancelButtonText: { fontSize: 15, color: Colors.textSecondary, fontFamily: "Inter_500Medium" },
-});

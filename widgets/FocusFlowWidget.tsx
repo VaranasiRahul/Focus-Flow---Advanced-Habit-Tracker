@@ -1,23 +1,11 @@
 /**
- * FocusFlow Home Screen Widget
- *
- * This renders the actual Android home screen widget UI.
- * Uses ONLY react-native-android-widget components (no standard RN components).
- *
- * Widget shows:
- *  - App name
- *  - Today's first pending task name
- *  - Time spent on that task
- *  - Number of pending tasks remaining
- *  - A play button (tapping opens the app)
+ * FocusFlow Android Home Screen Widget
+ * 
+ * Uses react-native-android-widget FlexWidget/TextWidget primitives.
+ * All values passed as props from the headless task handler.
  */
-
 import React from "react";
-import {
-  FlexWidget,
-  TextWidget,
-  ImageWidget,
-} from "react-native-android-widget";
+import { FlexWidget, TextWidget } from "react-native-android-widget";
 
 export interface FocusFlowWidgetProps {
   taskName: string;
@@ -27,165 +15,50 @@ export interface FocusFlowWidgetProps {
   completionPercent: number;
 }
 
-// Colors must be hex strings for Android widgets
-const BG = "#0A0A0A";
-const CARD = "#1A1A1A";
-const ACCENT = "#A3CC00";
-const TEXT = "#FFFFFF";
-const TEXT_DIM = "#888888";
-const TEXT_MUTED = "#555555";
-
-export function FocusFlowWidget({
-  taskName,
-  timeSpent,
-  pendingCount,
-  taskColor,
-  completionPercent,
-}: FocusFlowWidgetProps) {
-  const color = taskColor || ACCENT;
-  const hasTask = !!taskName && taskName !== "";
+export function FocusFlowWidget({ taskName, timeSpent, pendingCount, taskColor, completionPercent }: FocusFlowWidgetProps) {
+  const hasTask = taskName !== "";
+  const color = taskColor || "#A3CC00";
+  const pct = Math.min(Math.max(completionPercent, 0), 100);
 
   return (
     <FlexWidget
-      style={{
-        height: "match_parent",
-        width: "match_parent",
-        flexDirection: "column",
-        backgroundColor: CARD,
-        borderRadius: 16,
-        padding: 14,
-        justifyContent: "space-between",
-      }}
+      style={{ height: "match_parent", width: "match_parent", flexDirection: "column", backgroundColor: "#161616", borderRadius: 20, padding: 14 }}
       clickAction="OPEN_APP"
     >
-      {/* Header row */}
-      <FlexWidget
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 8,
-        }}
-      >
-        <TextWidget
-          text="FocusFlow"
-          style={{
-            fontSize: 11,
-            color: TEXT_MUTED,
-            fontStyle: "bold",
-          }}
-        />
-        <FlexWidget
-          style={{
-            backgroundColor: hasTask ? color + "33" : "#33333333",
-            borderRadius: 10,
-            paddingHorizontal: 6,
-            paddingVertical: 2,
-          }}
-        >
-          <TextWidget
-            text={`${pendingCount} pending`}
-            style={{
-              fontSize: 10,
-              color: hasTask ? color : TEXT_MUTED,
-              fontStyle: "bold",
-            }}
-          />
+      {/* Top: app name + badge */}
+      <FlexWidget style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <TextWidget text="FocusFlow" style={{ fontSize: 10, color: "#666666", fontStyle: "bold" }} />
+        <FlexWidget style={{ backgroundColor: color + "44", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
+          <TextWidget text={`${pendingCount} task${pendingCount !== 1 ? "s" : ""}`} style={{ fontSize: 10, color, fontStyle: "bold" }} />
         </FlexWidget>
       </FlexWidget>
 
       {/* Task name */}
       <TextWidget
         text={hasTask ? taskName : "All done for today! 🎉"}
-        style={{
-          fontSize: hasTask ? 15 : 13,
-          color: TEXT,
-          fontStyle: "bold",
-          maxLines: 2,
-        }}
+        style={{ fontSize: hasTask ? 16 : 13, color: "#FFFFFF", fontStyle: "bold", maxLines: 2 }}
       />
 
-      {/* Time spent */}
-      <FlexWidget
-        style={{
-          flexDirection: "row",
-          alignItems: "baseline",
-          gap: 4,
-          marginTop: 4,
-        }}
-      >
-        <TextWidget
-          text={timeSpent}
-          style={{
-            fontSize: 22,
-            color: hasTask ? color : ACCENT,
-            fontStyle: "bold",
-          }}
-        />
-        <TextWidget
-          text="spent"
-          style={{
-            fontSize: 11,
-            color: TEXT_DIM,
-          }}
-        />
+      {/* Time */}
+      <FlexWidget style={{ flexDirection: "row", alignItems: "baseline", gap: 5, marginTop: 6 }}>
+        <TextWidget text={timeSpent} style={{ fontSize: 26, color, fontStyle: "bold" }} />
+        <TextWidget text=" focused" style={{ fontSize: 11, color: "#888888" }} />
       </FlexWidget>
 
-      {/* Progress bar */}
-      <FlexWidget
-        style={{
-          height: 4,
-          backgroundColor: "#2A2A2A",
-          borderRadius: 2,
-          marginTop: 8,
-          overflow: "hidden",
-        }}
-      >
-        <FlexWidget
-          style={{
-            height: "match_parent",
-            width: `${Math.min(completionPercent, 100)}%`,
-            backgroundColor: color,
-            borderRadius: 2,
-          }}
-        />
+      {/* Progress bar background */}
+      <FlexWidget style={{ height: 5, backgroundColor: "#2A2A2A", borderRadius: 3, marginTop: 10, overflow: "hidden" }}>
+        {/* Progress fill — width as percentage string */}
+        <FlexWidget style={{ height: "match_parent", width: `${pct}%`, backgroundColor: color, borderRadius: 3 }} />
       </FlexWidget>
 
-      {/* Bottom row: tap hint */}
-      <FlexWidget
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginTop: 8,
-        }}
-      >
-        <TextWidget
-          text={hasTask ? "Tap to start" : "Tap to open app"}
-          style={{
-            fontSize: 10,
-            color: TEXT_MUTED,
-          }}
-        />
+      {/* Bottom row */}
+      <FlexWidget style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+        <TextWidget text={hasTask ? `${pct}% complete` : "Great work!"} style={{ fontSize: 10, color: "#555555" }} />
         <FlexWidget
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: 15,
-            backgroundColor: hasTask ? color : ACCENT,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+          style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: color, alignItems: "center", justifyContent: "center" }}
           clickAction="OPEN_APP"
         >
-          <TextWidget
-            text="▶"
-            style={{
-              fontSize: 12,
-              color: "#000000",
-              fontStyle: "bold",
-            }}
-          />
+          <TextWidget text="▶" style={{ fontSize: 12, color: "#000000", fontStyle: "bold" }} />
         </FlexWidget>
       </FlexWidget>
     </FlexWidget>

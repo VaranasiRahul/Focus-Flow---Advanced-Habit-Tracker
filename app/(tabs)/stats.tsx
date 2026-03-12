@@ -1,72 +1,67 @@
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView, Platform, Dimensions } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Dimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Rect, Text as SvgText, Line } from "react-native-svg";
+import Svg, { Rect, Circle, Path, Text as SvgText } from "react-native-svg";
 import { Feather } from "@expo/vector-icons";
-import { Colors } from "@/constants/colors";
+import { useTheme } from "@/context/ThemeContext";
 import { useTaskContext } from "@/context/TaskContext";
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
+const SW = Dimensions.get("window").width;
 
-function getDateString(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+function getDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
-
-function formatSeconds(s: number): string {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
+function fmt(s: number): string {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h}h ${String(m).padStart(2,"0")}m`;
   return `${m}m`;
+}
+function fmtFull(s: number): string {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h}h ${String(m).padStart(2,"0")}m`;
+  return `0h ${String(m).padStart(2,"0")}m`;
+}
+function today() { return getDateStr(new Date()); }
+
+// ----- Subcomponents -----
+
+function StatBox({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background, borderRadius: 12, padding: 12, alignItems: "center", minHeight: 72 }}>
+      <Text style={{ fontSize: 20, color: accent ?? colors.text, fontFamily: "Inter_700Bold" }}>{value}</Text>
+      <Text style={{ fontSize: 10, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center" }}>{label}</Text>
+      {sub ? <Text style={{ fontSize: 10, color: colors.textSecondary, fontFamily: "Inter_500Medium", marginTop: 2 }}>{sub}</Text> : null}
+    </View>
+  );
 }
 
 function WeekBarChart({ taskId, color }: { taskId: string; color: string }) {
+  const { colors } = useTheme();
   const { getRecordsForTask } = useTaskContext();
   const records = getRecordsForTask(taskId);
-
   const days = useMemo(() => {
-    const result = [];
-    const today = new Date();
+    const result = []; const now = new Date();
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dateStr = getDateString(d);
-      const record = records.find((r) => r.date === dateStr);
-      result.push({
-        label: ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"][d.getDay()],
-        seconds: record?.secondsSpent ?? 0,
-        isToday: i === 0,
-      });
+      const d = new Date(now); d.setDate(d.getDate() - i);
+      const rec = records.find((r) => r.date === getDateStr(d));
+      result.push({ label: ["Su","Mo","Tu","We","Th","Fr","Sa"][d.getDay()], seconds: rec?.secondsSpent ?? 0, isToday: i === 0 });
     }
     return result;
   }, [records]);
-
-  const maxSeconds = Math.max(...days.map((d) => d.seconds), 1);
-  const chartW = SCREEN_WIDTH - 80;
-  const chartH = 80;
-  const barW = Math.floor((chartW - 6 * 6) / 7);
-  const gap = (chartW - barW * 7) / 6;
-
+  const maxS = Math.max(...days.map((d) => d.seconds), 1);
+  const W = SW - 80, H = 90;
+  const bW = Math.floor((W - 6 * 8) / 7), gap = (W - bW * 7) / 6;
   return (
-    <Svg width={chartW} height={chartH + 20}>
+    <Svg width={W} height={H + 24}>
       {days.map((day, i) => {
-        const barH = Math.max((day.seconds / maxSeconds) * chartH, day.seconds > 0 ? 4 : 0);
-        const x = i * (barW + gap);
-        const y = chartH - barH;
+        const bH = day.seconds > 0 ? Math.max((day.seconds / maxS) * H, 6) : 4;
+        const x = i * (bW + gap), y = H - bH;
         return (
           <React.Fragment key={i}>
-            <Rect x={x} y={0} width={barW} height={chartH} rx={6} fill="#1E1E1E" />
-            {barH > 0 && (
-              <Rect x={x} y={y} width={barW} height={barH} rx={6} fill={day.isToday ? color : `${color}88`} />
-            )}
-            <SvgText
-              x={x + barW / 2} y={chartH + 15}
-              textAnchor="middle"
-              fill={day.isToday ? Colors.text : Colors.textMuted}
-              fontSize={10}
-              fontWeight={day.isToday ? "700" : "400"}
-            >
-              {day.label}
-            </SvgText>
+            <Rect x={x} y={0} width={bW} height={H} rx={5} fill={colors.border} />
+            <Rect x={x} y={y} width={bW} height={bH} rx={5} fill={day.isToday ? color : color + "88"} />
+            <SvgText x={x + bW / 2} y={H + 18} textAnchor="middle" fill={day.isToday ? color : colors.textMuted} fontSize={10} fontWeight={day.isToday ? "700" : "400"}>{day.label}</SvgText>
           </React.Fragment>
         );
       })}
@@ -74,233 +69,300 @@ function WeekBarChart({ taskId, color }: { taskId: string; color: string }) {
   );
 }
 
-function StreakCalendar({ taskId, targetMinutes, color }: { taskId: string; targetMinutes: number; color: string }) {
-  const { getRecordsForTask } = useTaskContext();
+function HeatMap({ taskId, color }: { taskId: string; color: string }) {
+  const { colors } = useTheme();
+  const { getRecordsForTask, tasks } = useTaskContext();
   const records = getRecordsForTask(taskId);
-  const targetSeconds = targetMinutes * 60;
+  const task = tasks.find((t) => t.id === taskId);
+  const targetS = (task?.targetMinutes ?? 60) * 60;
 
   const weeks = useMemo(() => {
-    const today = new Date();
-    const result: { date: string; achieved: boolean; future: boolean }[][] = [];
-    let week: { date: string; achieved: boolean; future: boolean }[] = [];
-
-    for (let i = 27; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dateStr = getDateString(d);
-      const record = records.find((r) => r.date === dateStr);
-      const achieved = record ? record.secondsSpent >= targetSeconds : false;
-      const future = d > today;
-      week.push({ date: dateStr, achieved, future });
-      if (week.length === 7) {
-        result.push(week);
-        week = [];
-      }
+    const grid: { date: string; seconds: number; level: number }[][] = [];
+    const now = new Date();
+    // Go back 12 weeks (84 days) and align to Sunday
+    const start = new Date(now);
+    start.setDate(start.getDate() - 83);
+    start.setDate(start.getDate() - start.getDay()); // align to Sunday
+    let week: { date: string; seconds: number; level: number }[] = [];
+    for (let i = 0; i < 84; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      if (d > now) { week.push({ date: "", seconds: 0, level: -1 }); continue; }
+      const ds = getDateStr(d);
+      const rec = records.find((r) => r.date === ds);
+      const s = rec?.secondsSpent ?? 0;
+      const level = s === 0 ? 0 : s < targetS * 0.25 ? 1 : s < targetS * 0.5 ? 2 : s < targetS ? 3 : 4;
+      week.push({ date: ds, seconds: s, level });
+      if (week.length === 7) { grid.push(week); week = []; }
     }
-    if (week.length > 0) result.push(week);
-    return result;
-  }, [records, targetSeconds]);
+    if (week.length > 0) grid.push(week);
+    return grid;
+  }, [records, targetS]);
+
+  const cellSize = Math.min(Math.floor((SW - 80) / 12) - 2, 18);
+  const levelColors = ["#1A1A1A", color + "44", color + "77", color + "AA", color];
 
   return (
-    <View style={calStyles.grid}>
-      {weeks.map((week, wi) => (
-        <View key={wi} style={calStyles.week}>
-          {week.map((day, di) => (
-            <View
-              key={di}
-              style={[
-                calStyles.cell,
-                day.achieved && { backgroundColor: color },
-                !day.achieved && !day.future && { backgroundColor: "#1E1E1E" },
-                day.future && { backgroundColor: "transparent" },
-              ]}
+    <View>
+      <Svg width={(cellSize + 2) * 12 + 16} height={(cellSize + 2) * 7 + 16}>
+        {weeks.map((week, wi) =>
+          week.map((day, di) => (
+            <Rect key={`${wi}-${di}`}
+              x={16 + wi * (cellSize + 2)} y={di * (cellSize + 2) + 16}
+              width={cellSize} height={cellSize} rx={3}
+              fill={day.level === -1 ? "transparent" : levelColors[day.level]}
             />
-          ))}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-const calStyles = StyleSheet.create({
-  grid: { flexDirection: "row", gap: 3 },
-  week: { gap: 3 },
-  cell: { width: 12, height: 12, borderRadius: 2 },
-});
-
-function TaskStatCard({ task }: { task: any }) {
-  const { getTodayRecord, getStreak, getRecordsForTask } = useTaskContext();
-  const todayRecord = getTodayRecord(task.id);
-  const streak = getStreak(task.id);
-  const allRecords = getRecordsForTask(task.id);
-  const totalSeconds = allRecords.reduce((sum, r) => sum + r.secondsSpent, 0);
-  const daysTracked = allRecords.filter((r) => r.secondsSpent > 0).length;
-  const todaySeconds = todayRecord?.secondsSpent ?? 0;
-  const progress = task.targetMinutes > 0 ? Math.min(todaySeconds / (task.targetMinutes * 60), 1) : 0;
-  const avgSeconds = daysTracked > 0 ? Math.floor(totalSeconds / daysTracked) : 0;
-
-  return (
-    <View style={styles.taskStatCard}>
-      <View style={styles.taskStatHeader}>
-        <View style={[styles.taskColorDot, { backgroundColor: task.color }]} />
-        <Text style={styles.taskStatName} numberOfLines={1}>{task.name}</Text>
-        {streak > 0 && (
-          <View style={styles.streakBadge}>
-            <Feather name="zap" size={11} color="#FF6B35" />
-            <Text style={styles.streakText}>{streak} day{streak !== 1 ? "s" : ""}</Text>
-          </View>
+          ))
         )}
-      </View>
-
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{formatSeconds(todaySeconds)}</Text>
-          <Text style={styles.statLabel}>Today</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{formatSeconds(totalSeconds)}</Text>
-          <Text style={styles.statLabel}>All Time</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{formatSeconds(avgSeconds)}</Text>
-          <Text style={styles.statLabel}>Avg/Day</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, streak > 0 && { color: "#FF6B35" }]}>
-            {streak}
-          </Text>
-          <Text style={styles.statLabel}>Streak</Text>
-        </View>
-      </View>
-
-      <View style={styles.progressBarBg}>
-        <View style={[styles.progressBarFill, { width: `${progress * 100}%` as any, backgroundColor: task.color }]} />
-      </View>
-      <Text style={styles.progressLabel}>{Math.round(progress * 100)}% of today's goal</Text>
-
-      <View style={styles.chartContainer}>
-        <Text style={styles.chartTitle}>This Week</Text>
-        <WeekBarChart taskId={task.id} color={task.color} />
-      </View>
-
-      <View style={styles.calendarContainer}>
-        <Text style={styles.chartTitle}>Last 28 Days</Text>
-        <StreakCalendar taskId={task.id} targetMinutes={task.targetMinutes} color={task.color} />
+        {["S","M","T","W","T","F","S"].map((l, i) => (
+          <SvgText key={i} x={12} y={i * (cellSize + 2) + cellSize + 18} textAnchor="end" fill={colors.textMuted} fontSize={8}>{l}</SvgText>
+        ))}
+      </Svg>
+      <View style={{ flexDirection: "row", gap: 4, alignItems: "center", marginTop: 4 }}>
+        <Text style={{ fontSize: 9, color: colors.textMuted, fontFamily: "Inter_400Regular" }}>Less</Text>
+        {levelColors.map((c, i) => <View key={i} style={{ width: cellSize, height: cellSize, borderRadius: 3, backgroundColor: c }} />)}
+        <Text style={{ fontSize: 9, color: colors.textMuted, fontFamily: "Inter_400Regular" }}>More</Text>
       </View>
     </View>
   );
 }
 
-function TodayOverview() {
-  const { getTodayTasks, dailyRecords } = useTaskContext();
-  const todayTasks = getTodayTasks();
-  const today = getDateString(new Date());
+function LineChart({ taskId, color }: { taskId: string; color: string }) {
+  const { colors } = useTheme();
+  const { getRecordsForTask } = useTaskContext();
+  const records = getRecordsForTask(taskId);
+  const days = useMemo(() => {
+    const result = []; const now = new Date();
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(now); d.setDate(d.getDate() - i);
+      const rec = records.find((r) => r.date === getDateStr(d));
+      result.push({ seconds: rec?.secondsSpent ?? 0, isToday: i === 0 });
+    }
+    return result;
+  }, [records]);
+  const maxS = Math.max(...days.map((d) => d.seconds), 1);
+  const W = SW - 80, H = 60;
+  const stepX = W / (days.length - 1);
+  const pts = days.map((d, i) => ({ x: i * stepX, y: H - (d.seconds / maxS) * H }));
+  const pathD = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+  return (
+    <Svg width={W} height={H + 8}>
+      <Path d={pathD} stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      {pts.map((p, i) => <Circle key={i} cx={p.x} cy={p.y} r={days[i].isToday ? 5 : 3} fill={days[i].isToday ? color : color + "88"} />)}
+    </Svg>
+  );
+}
 
-  const totalSeconds = useMemo(() => {
-    return dailyRecords.filter((r) => r.date === today).reduce((sum, r) => sum + r.secondsSpent, 0);
-  }, [dailyRecords, today]);
+function StreakFlame({ count, color }: { count: number; color: string }) {
+  return (
+    <View style={{ alignItems: "center", gap: 2 }}>
+      <Text style={{ fontSize: 28 }}>🔥</Text>
+      <Text style={{ fontSize: 22, color, fontFamily: "Inter_700Bold" }}>{count}</Text>
+      <Text style={{ fontSize: 10, color: "#888", fontFamily: "Inter_400Regular" }}>day streak</Text>
+    </View>
+  );
+}
 
-  const completed = useMemo(() => {
-    return todayTasks.filter((t) => {
-      const record = dailyRecords.find((r) => r.taskId === t.id && r.date === today);
-      return record && record.secondsSpent >= t.targetMinutes * 60;
-    }).length;
-  }, [todayTasks, dailyRecords, today]);
+function TaskStatsCard({ taskId }: { taskId: string }) {
+  const { colors } = useTheme();
+  const { tasks, getRecordsForTask, getStreak, dailyRecords } = useTaskContext();
+  const task = tasks.find((t) => t.id === taskId);
+  const [chartTab, setChartTab] = useState<"week"|"trend"|"heatmap">("week");
+  if (!task) return null;
 
-  const completionRate = todayTasks.length > 0 ? (completed / todayTasks.length) * 100 : 0;
+  const records = getRecordsForTask(taskId);
+  const streak = getStreak(taskId);
+  const todayRec = records.find((r) => r.date === today());
+  const todayS = todayRec?.secondsSpent ?? 0;
+  const allS = records.reduce((s, r) => s + r.secondsSpent, 0);
+  const activeDays = records.filter((r) => r.secondsSpent > 0).length;
+  const avgS = activeDays > 0 ? Math.round(allS / activeDays) : 0;
+  const completedDays = records.filter((r) => r.secondsSpent >= task.targetMinutes * 60).length;
+  const completionRate = activeDays > 0 ? Math.round((completedDays / activeDays) * 100) : 0;
+  const targetS = task.targetMinutes * 60;
+  const todayProgress = targetS > 0 ? Math.min(todayS / targetS, 1) : 0;
+  const bestDay = records.reduce((best, r) => r.secondsSpent > best ? r.secondsSpent : best, 0);
 
   return (
-    <View style={styles.overviewCard}>
-      <Text style={styles.overviewTitle}>Today's Overview</Text>
-      <View style={styles.overviewRow}>
-        <View style={styles.overviewItem}>
-          <Text style={styles.overviewValue}>{formatSeconds(totalSeconds)}</Text>
-          <Text style={styles.overviewLabel}>Total Focus</Text>
-        </View>
-        <View style={styles.overviewDivider} />
-        <View style={styles.overviewItem}>
-          <Text style={styles.overviewValue}>{completed}/{todayTasks.length}</Text>
-          <Text style={styles.overviewLabel}>Completed</Text>
-        </View>
-        <View style={styles.overviewDivider} />
-        <View style={styles.overviewItem}>
-          <Text style={[styles.overviewValue, { color: completionRate >= 100 ? "#1ABC9C" : Colors.accent }]}>
-            {completionRate.toFixed(2)}%
-          </Text>
-          <Text style={styles.overviewLabel}>Rate</Text>
-        </View>
+    <View style={{ backgroundColor: colors.card, borderRadius: 16, padding: 16, gap: 12 }}>
+      {/* Header */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: task.color }} />
+        <Text style={{ flex: 1, fontSize: 16, color: colors.text, fontFamily: "Inter_700Bold" }}>{task.name}</Text>
+        <StreakFlame count={streak} color={task.color} />
       </View>
-      {todayTasks.length > 0 && (
-        <View style={styles.overviewBar}>
-          <View style={[styles.overviewBarFill, { width: `${completionRate}%` as any }]} />
+
+      {/* Today's progress bar */}
+      <View style={{ gap: 4 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ fontSize: 11, color: colors.textSecondary, fontFamily: "Inter_500Medium" }}>Today's Progress</Text>
+          <Text style={{ fontSize: 11, color: task.color, fontFamily: "Inter_700Bold" }}>{Math.round(todayProgress * 100)}%</Text>
+        </View>
+        <View style={{ height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: "hidden" }}>
+          <View style={{ height: "100%", width: `${todayProgress * 100}%`, backgroundColor: task.color, borderRadius: 4 }} />
+        </View>
+        <Text style={{ fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" }}>{fmtFull(todayS)} / {fmtFull(targetS)}</Text>
+      </View>
+
+      {/* 4 stat boxes */}
+      <View style={{ flexDirection: "row", gap: 6 }}>
+        <StatBox label="Today" value={fmt(todayS)} accent={task.color} />
+        <StatBox label="All Time" value={fmt(allS)} />
+        <StatBox label="Avg/Day" value={fmt(avgS)} />
+        <StatBox label="Best Day" value={fmt(bestDay)} />
+      </View>
+
+      {/* Completion row */}
+      <View style={{ flexDirection: "row", gap: 6 }}>
+        <StatBox label="Done Days" value={String(completedDays)} />
+        <StatBox label="Rate" value={`${completionRate}%`} accent={completionRate > 70 ? "#1ABC9C" : completionRate > 40 ? "#F39C12" : "#E74C3C"} />
+        <StatBox label="Active Days" value={String(activeDays)} />
+        <StatBox label="Target" value={fmt(targetS)} />
+      </View>
+
+      {/* Chart tabs */}
+      <View style={{ flexDirection: "row", gap: 6 }}>
+        {(["week","trend","heatmap"] as const).map((tab) => (
+          <TouchableOpacity key={tab} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: chartTab === tab ? task.color : colors.background }} onPress={() => setChartTab(tab)}>
+            <Text style={{ fontSize: 12, color: chartTab === tab ? "#000" : colors.textSecondary, fontFamily: "Inter_600SemiBold" }}>{tab === "week" ? "This Week" : tab === "trend" ? "14-Day Trend" : "Heatmap"}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={{ alignItems: "flex-start" }}>
+        {chartTab === "week" && <WeekBarChart taskId={taskId} color={task.color} />}
+        {chartTab === "trend" && <LineChart taskId={taskId} color={task.color} />}
+        {chartTab === "heatmap" && <HeatMap taskId={taskId} color={task.color} />}
+      </View>
+
+      {/* Best streak info */}
+      {streak > 0 && (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.background, borderRadius: 10, padding: 10 }}>
+          <Text style={{ fontSize: 14 }}>🔥</Text>
+          <Text style={{ fontSize: 13, color: colors.text, fontFamily: "Inter_500Medium", flex: 1 }}>
+            You're on a <Text style={{ color: task.color, fontFamily: "Inter_700Bold" }}>{streak}-day</Text> streak. Keep it up!
+          </Text>
         </View>
       )}
     </View>
   );
 }
 
-export default function StatsScreen() {
-  const insets = useSafeAreaInsets();
-  const { tasks } = useTaskContext();
-  const topPadding = Platform.OS === "web" ? 67 : insets.top;
+function OverallSummaryCard() {
+  const { colors } = useTheme();
+  const { tasks, dailyRecords, getTodayTasks } = useTaskContext();
+  const todayStr = today();
+  const todayTasks = getTodayTasks();
+  const todayRecords = dailyRecords.filter((r) => r.date === todayStr);
+  const totalFocusToday = todayRecords.reduce((s, r) => s + r.secondsSpent, 0);
+  const completedToday = todayTasks.filter((t) => {
+    const rec = todayRecords.find((r) => r.taskId === t.id);
+    return rec && rec.secondsSpent >= t.targetMinutes * 60;
+  }).length;
+  const completionRate = todayTasks.length > 0 ? (completedToday / todayTasks.length) * 100 : 0;
+
+  // Last 7 days total focus
+  const weekData = useMemo(() => {
+    const d = []; const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now); date.setDate(date.getDate() - i);
+      const ds = getDateStr(date);
+      const secs = dailyRecords.filter((r) => r.date === ds).reduce((s, r) => s + r.secondsSpent, 0);
+      d.push({ secs, isToday: i === 0 });
+    }
+    return d;
+  }, [dailyRecords]);
+  const weekTotal = weekData.reduce((s, d) => s + d.secs, 0);
+  const allTimeTotal = dailyRecords.reduce((s, r) => s + r.secondsSpent, 0);
+  const maxStreak = Math.max(...tasks.map((t) => 0), 0); // placeholder
 
   return (
-    <View style={[styles.container, { paddingTop: topPadding }]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Statistics</Text>
+    <View style={{ backgroundColor: colors.card, borderRadius: 16, padding: 16, gap: 12 }}>
+      <Text style={{ fontSize: 16, color: colors.text, fontFamily: "Inter_700Bold" }}>Today's Overview</Text>
+
+      <View style={{ flexDirection: "row", gap: 1 }}>
+        {[
+          { value: fmtFull(totalFocusToday), label: "Total Focus", accent: colors.accent },
+          { value: `${completedToday}/${todayTasks.length}`, label: "Completed", accent: colors.text },
+          { value: `${completionRate.toFixed(2)}%`, label: "Rate", accent: completionRate > 70 ? "#1ABC9C" : completionRate > 30 ? "#F39C12" : colors.accent },
+        ].map((item, i) => (
+          <View key={i} style={{ flex: 1, alignItems: "center", ...(i > 0 ? { borderLeftWidth: 1, borderLeftColor: colors.border } : {}) }}>
+            <Text style={{ fontSize: 20, color: item.accent, fontFamily: "Inter_700Bold" }}>{item.value}</Text>
+            <Text style={{ fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" }}>{item.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={{ height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: "hidden" }}>
+        <View style={{ height: "100%", width: `${completionRate}%`, backgroundColor: colors.accent, borderRadius: 3 }} />
+      </View>
+
+      {/* Weekly summary */}
+      <View style={{ flexDirection: "row", gap: 6 }}>
+        <View style={{ flex: 1, backgroundColor: colors.background, borderRadius: 12, padding: 10, alignItems: "center" }}>
+          <Text style={{ fontSize: 16, color: colors.accent, fontFamily: "Inter_700Bold" }}>{fmtFull(weekTotal)}</Text>
+          <Text style={{ fontSize: 10, color: colors.textMuted, fontFamily: "Inter_400Regular" }}>This Week</Text>
+        </View>
+        <View style={{ flex: 1, backgroundColor: colors.background, borderRadius: 12, padding: 10, alignItems: "center" }}>
+          <Text style={{ fontSize: 16, color: colors.text, fontFamily: "Inter_700Bold" }}>{fmtFull(allTimeTotal)}</Text>
+          <Text style={{ fontSize: 10, color: colors.textMuted, fontFamily: "Inter_400Regular" }}>All Time</Text>
+        </View>
+        <View style={{ flex: 1, backgroundColor: colors.background, borderRadius: 12, padding: 10, alignItems: "center" }}>
+          <Text style={{ fontSize: 16, color: colors.text, fontFamily: "Inter_700Bold" }}>{tasks.length}</Text>
+          <Text style={{ fontSize: 10, color: colors.textMuted, fontFamily: "Inter_400Regular" }}>Total Tasks</Text>
+        </View>
+      </View>
+
+      {/* Mini 7-day bar chart */}
+      <View>
+        <Text style={{ fontSize: 12, color: colors.textSecondary, fontFamily: "Inter_500Medium", marginBottom: 6 }}>Last 7 Days</Text>
+        <View style={{ flexDirection: "row", alignItems: "flex-end", height: 40, gap: 4 }}>
+          {weekData.map((d, i) => {
+            const maxS = Math.max(...weekData.map((x) => x.secs), 1);
+            const h = d.secs > 0 ? Math.max((d.secs / maxS) * 36, 4) : 4;
+            const labels = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+            const dayLabel = labels[(new Date().getDay() - 6 + i + 7) % 7];
+            return (
+              <View key={i} style={{ flex: 1, alignItems: "center", gap: 2 }}>
+                <View style={{ width: "100%", height: h, backgroundColor: d.isToday ? colors.accent : (d.secs > 0 ? colors.accent + "66" : colors.border), borderRadius: 3 }} />
+                <Text style={{ fontSize: 8, color: d.isToday ? colors.accent : colors.textMuted, fontFamily: "Inter_500Medium" }}>{dayLabel}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+export default function StatsScreen() {
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const { tasks } = useTaskContext();
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: topPad }}>
+      <View style={{ paddingHorizontal: 20, paddingVertical: 14 }}>
+        <Text style={{ fontSize: 28, color: colors.text, fontFamily: "Inter_700Bold" }}>Statistics</Text>
+        <Text style={{ fontSize: 13, color: colors.textSecondary, fontFamily: "Inter_400Regular", marginTop: 2 }}>Your focus activity overview</Text>
       </View>
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: Platform.OS === "web" ? 120 : Platform.OS === "android" ? 20 : 100 + insets.bottom }]}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 14, paddingBottom: Platform.OS === "android" ? 20 : 100 + insets.bottom }}
         showsVerticalScrollIndicator={false}
       >
-        <TodayOverview />
+        <OverallSummaryCard />
+
         {tasks.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Feather name="bar-chart-2" size={48} color={Colors.textMuted} />
-            <Text style={styles.emptyTitle}>No data yet</Text>
-            <Text style={styles.emptySubtitle}>Create tasks and start tracking to see your stats.</Text>
+          <View style={{ alignItems: "center", paddingVertical: 60, gap: 12 }}>
+            <Text style={{ fontSize: 40 }}>📊</Text>
+            <Text style={{ fontSize: 18, color: colors.text, fontFamily: "Inter_600SemiBold" }}>No data yet</Text>
+            <Text style={{ fontSize: 14, color: colors.textSecondary, fontFamily: "Inter_400Regular", textAlign: "center" }}>Add tasks on the Home tab and start your first session to see stats here.</Text>
           </View>
         ) : (
-          tasks.map((task) => <TaskStatCard key={task.id} task={task} />)
+          tasks.map((task) => <TaskStatsCard key={task.id} taskId={task.id} />)
         )}
       </ScrollView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingVertical: 14 },
-  headerTitle: { fontSize: 24, color: Colors.text, fontFamily: "Inter_700Bold" },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, gap: 16 },
-  overviewCard: { backgroundColor: Colors.card, borderRadius: 16, padding: 18, marginBottom: 4, gap: 14 },
-  overviewTitle: { fontSize: 14, color: Colors.textSecondary, fontFamily: "Inter_500Medium" },
-  overviewRow: { flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
-  overviewItem: { alignItems: "center" },
-  overviewValue: { fontSize: 22, color: Colors.text, fontFamily: "Inter_700Bold" },
-  overviewLabel: { fontSize: 11, color: Colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
-  overviewDivider: { width: 1, height: 32, backgroundColor: Colors.border },
-  overviewBar: { height: 4, backgroundColor: Colors.border, borderRadius: 2, overflow: "hidden" },
-  overviewBarFill: { height: "100%", backgroundColor: Colors.accent, borderRadius: 2 },
-  taskStatCard: { backgroundColor: Colors.card, borderRadius: 16, padding: 18, gap: 12 },
-  taskStatHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
-  taskColorDot: { width: 10, height: 10, borderRadius: 5 },
-  taskStatName: { flex: 1, fontSize: 15, color: Colors.text, fontFamily: "Inter_600SemiBold" },
-  streakBadge: { flexDirection: "row", alignItems: "center", backgroundColor: "#FF6B3520", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, gap: 3 },
-  streakText: { fontSize: 12, color: "#FF6B35", fontFamily: "Inter_700Bold" },
-  statsRow: { flexDirection: "row", gap: 8 },
-  statItem: { flex: 1, backgroundColor: Colors.background, borderRadius: 10, padding: 10, alignItems: "center" },
-  statValue: { fontSize: 14, color: Colors.text, fontFamily: "Inter_700Bold" },
-  statLabel: { fontSize: 9, color: Colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
-  progressBarBg: { height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: "hidden" },
-  progressBarFill: { height: "100%", borderRadius: 3 },
-  progressLabel: { fontSize: 11, color: Colors.textMuted, fontFamily: "Inter_400Regular" },
-  chartContainer: { gap: 8 },
-  calendarContainer: { gap: 8 },
-  chartTitle: { fontSize: 12, color: Colors.textSecondary, fontFamily: "Inter_500Medium" },
-  emptyState: { alignItems: "center", paddingVertical: 60, gap: 12 },
-  emptyTitle: { fontSize: 18, color: Colors.text, fontFamily: "Inter_600SemiBold" },
-  emptySubtitle: { fontSize: 14, color: Colors.textSecondary, fontFamily: "Inter_400Regular", textAlign: "center", paddingHorizontal: 20 },
-});
